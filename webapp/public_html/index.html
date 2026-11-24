@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Phone Control Center</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080d; --panel: #10151e; --panel-2: #0b1017;
+      --line: #253345; --text: #edf3fb; --muted: #91a0b4;
+      --accent: #53c9ff; --good: #43d6a1; --bad: #ff707d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(ellipse at 18% 0%, #102033 0, var(--bg) 45%); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; color: var(--text); background: #142334; border: 1px solid #34506a; border-radius: 8px; padding: 9px 13px; }
+    button:hover { background: #1a344b; border-color: #4a7799; }
+    button:disabled { opacity: .48; cursor: default; }
+    input { color: var(--text); background: #080d13; border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; }
+    .app { max-width: 1800px; margin: 0 auto; padding: 18px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 15px; }
+    h1 { font-size: clamp(22px, 3vw, 34px); letter-spacing: -.04em; margin: 0; }
+    .sub, .muted { color: var(--muted); }
+    .sub { margin: 5px 0 0; }
+    .connection { display: flex; align-items: center; gap: 9px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 12px currentColor; }
+    .dot.on { background: var(--good); color: var(--good); }
+    .panel { background: linear-gradient(160deg, #111925, #0b0f16); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 14px; box-shadow: 0 14px 40px #0005; }
+    .setup { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+    .setup label { display: grid; gap: 5px; color: var(--muted); }
+    .setup input { width: min(430px, 76vw); }
+    .stats { display: flex; gap: 22px; flex-wrap: wrap; padding: 14px 2px 0; color: var(--accent); font-weight: 650; }
+    .action-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(380px, .9fr); align-items: stretch; }
+    .action-controls { min-width: 0; padding-right: 16px; }
+    .toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .app-launchers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .session-runner { min-width: 0; display: grid; align-content: start; gap: 9px; border-left: 1px solid var(--line); padding-left: 16px; }
+    .session-copy { display: grid; gap: 2px; }
+    .session-copy span { color: var(--muted); font-size: 12px; }
+    .session-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .session-clock { color: var(--accent); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 750; min-width: 58px; text-align: center; }
+    .session-help { margin: 0; color: var(--muted); font-size: 12px; }
+    .check { display: inline-flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; }
+    input[type=checkbox] { accent-color: #168deb; width: 16px; height: 16px; }
+    .screen-placeholder { color: #78869a; text-align: center; padding: 20px 10px; overflow-wrap: anywhere; }
+    .phone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .phone-card { min-width: 0; background: #090e15; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+    .phone-card.source { border-color: var(--accent); box-shadow: 0 0 0 1px #53c9ff55, 0 0 18px #53c9ff22; }
+    .phone-head { display: flex; justify-content: space-between; align-items: start; gap: 7px; }
+    .phone-name { font-weight: 700; overflow-wrap: anywhere; }
+    .phone-state { color: var(--muted); font-size: 12px; min-height: 18px; }
+    .phone-frame { background: #030507; border: 1px solid #263548; border-radius: 7px; display: grid; place-items: center; aspect-ratio: 9 / 16; max-height: min(55vh, 520px); margin-top: 8px; overflow: hidden; }
+    .phone-frame img { max-width: 100%; max-height: 100%; object-fit: contain; touch-action: none; cursor: crosshair; }
+    .phone-frame .screen-placeholder { padding: 8px; font-size: 12px; }
+    .status { color: var(--muted); min-height: 22px; padding-top: 10px; }
+    .status.error { color: var(--bad); }
+    .warning { font-size: 12px; color: var(--muted); margin-top: 10px; }
+    @media (max-width: 1050px) {
+      .action-layout { grid-template-columns: minmax(0, 1fr); }
+      .action-controls { padding-right: 0; }
+      .session-runner { border-left: 0; border-top: 1px solid var(--line); margin-top: 14px; padding: 12px 0 0; }
+    }
+    @media (max-width: 780px) {
+      .app { padding: 12px; } header { align-items: flex-start; }
+      .phone-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+      .phone-frame { max-height: 42vh; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>Phone Control Center</h1>
+        <p class="sub">Connected Android previews · manual app sessions · mirrored phone control</p>
+      </div>
+      <div class="connection"><span id="connectionDot" class="dot"></span><span id="connectionText">Bridge disconnected</span></div>
+    </header>
+
+    <section class="panel">
+      <div class="action-layout">
+        <div class="action-controls">
+          <div class="toolbar">
+            <button id="selectAll" disabled>Select all</button>
+            <button id="selectNone" disabled>Select none</button>
+            <button id="wakeButton" disabled>Wake selected</button>
+            <label class="check"><input id="mirror" type="checkbox" checked> Mirror input to selected</label>
+          </div>
+          <div class="app-launchers" aria-label="App launch controls">
+            <button class="app-launch" data-package="com.facebook.katana" disabled>Facebook</button>
+            <button class="app-launch" data-package="com.instagram.android" disabled>Instagram</button>
+            <button class="app-launch" data-package="com.twitter.android" disabled>X</button>
+            <button class="app-launch" data-package="com.google.android.youtube" disabled>YouTube</button>
+            <button class="app-launch" data-package="com.snapchat.android" disabled>Snapchat</button>
+            <button class="app-launch" data-package="com.google.android.apps.docs" disabled>Google Drive</button>
+            <button class="app-launch" data-package="com.android.vending" title="Google Play Store on Android" disabled>Play Store</button>
+          </div>
+        </div>
+        <div class="session-runner" aria-label="Manual app session">
+          <div class="session-copy">
+            <strong>Power Boost · manual session</strong>
+            <span id="sessionLabel">Facebook → Instagram → YouTube · 3 minutes each; scrolling stays manual</span>
+          </div>
+          <div class="session-controls">
+            <span class="session-clock" id="sessionClock">3:00 each</span>
+            <button id="sessionStart" disabled>Start session</button>
+            <button id="sessionNext" disabled>Next app</button>
+            <button id="sessionPause" disabled>Pause</button>
+            <button id="sessionStop" disabled>Stop</button>
+          </div>
+          <p class="session-help">Select the Android phones to control in the device cards below. Each app button opens that app on the selected phones. The keyboard target is the source phone; taps, swipes, and supported keys are mirrored to selected phones.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="setup">
+        <label>Local computer bridge token
+          <input id="token" type="password" autocomplete="off" placeholder="Paste the token printed by bridge.py --init">
+        </label>
+        <button id="connectButton">Connect to this computer</button>
+        <button id="refreshButton" disabled>Refresh devices</button>
+      </div>
+      <div class="stats">
+        <span id="connectedCount">Connected: 0</span>
+        <span id="androidCount">Android: 0</span>
+        <span id="selectedCount">Selected: 0</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar" style="margin-bottom:12px">
+        <label class="muted">Keyboard target <select id="target" disabled style="min-width:240px; background:#080d13; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px"></select></label>
+        <label class="check"><input id="keyboardFocus" type="checkbox" checked> Send keys while preview is focused</label>
+      </div>
+      <p class="section-title">Connected Android screens · tap a screen to control it</p>
+      <div id="phoneGrid" class="phone-grid"></div>
+      <div id="status" class="status">Upload this page to Hostinger, then open it in a browser on the computer running the bridge.</div>
+    </section>
+    <p class="warning">Open this page on the same Mac or Windows PC that runs the bridge and has the Android phones connected.</p>
+  </main>
+
+  <script>
+    (() => {
+      const API = "http://127.0.0.1:8765";
+      const WS = "ws://127.0.0.1:8765/ws/preview";
+      const el = (id) => document.getElementById(id);
+      const state = { token: sessionStorage.getItem("pcc-token") || "", socket: null, devices: [], deviceSignature: "", selected: new Set(), previewStates: {}, frames: {}, pointer: null, host: "computer", adb: false, connected: false };
+      const sessionApps = [
+        { name: "Facebook", package: "com.facebook.katana" },
+        { name: "Instagram", package: "com.instagram.android" },
+        { name: "YouTube", package: "com.google.android.youtube" },
+      ];
+      const session = { active: false, paused: false, launching: false, index: -1, remaining: 180, serials: [], timer: null };
+      el("token").value = state.token;
+
+      function setStatus(text, error = false) {
+        el("status").textContent = text;
+        el("status").classList.toggle("error", error);
+      }
+      function hostLabel(host) { return host === "Darwin" ? "macOS" : host; }
+      function setConnected(value, host = state.host) {
+        state.connected = value;
+        el("connectionDot").classList.toggle("on", value);
+        el("connectionText").textContent = value ? `Bridge connected · ${hostLabel(host)}` : "Bridge disconnected";
+        el("refreshButton").disabled = !value;
+        ["selectAll", "selectNone", "wakeButton"].forEach(id => el(id).disabled = !value);
+        document.querySelectorAll(".app-launch").forEach(button => button.disabled = !value);
+        if (!value && session.active && !session.paused) {
+          session.paused = true;
+          if (session.timer) clearInterval(session.timer);
+          session.timer = null;
+          el("sessionLabel").textContent = "Bridge disconnected · session paused; reconnect to resume";
+        }
+        renderSession();
+      }
+      function authHeaders() { return { "Authorization": `Bearer ${state.token}`, "Content-Type": "application/json" }; }
+      function onlineAndroids() { return state.devices.filter(d => d.state === "device"); }
+
+      function selectedTargets(source) {
+        if (!source) return [];
+        const targets = [source];
+        if (el("mirror").checked) for (const serial of state.selected) if (!targets.includes(serial)) targets.push(serial);
+        return targets;
+      }
+      function updateCounts() {
+        const online = onlineAndroids();
+        el("connectedCount").textContent = `Connected: ${online.length}`;
+        el("androidCount").textContent = `Android: ${online.length}`;
+        el("selectedCount").textContent = `Selected: ${state.selected.size}`;
+        renderSession();
+      }
+
+      function optionLabel(d) { return `${d.label} (${d.serial})`; }
+      function orderedDevices() {
+        return [...state.devices].sort((a, b) => a.serial.localeCompare(b.serial));
+      }
+
+      function updateTargetStyle() {
+        for (const card of el("phoneGrid").children) {
+          card.classList.toggle("source", card.dataset.serial === el("target").value);
+        }
+      }
+      function chooseTarget(serial) {
+        if (!onlineAndroids().some(d => d.serial === serial)) return;
+        el("target").value = serial;
+        updateTargetStyle();
+      }
+
+      function buildDevices() {
+        const online = onlineAndroids();
+        const target = el("target");
+        const previous = target.value;
+        target.replaceChildren();
+        for (const d of online) {
+          const option = document.createElement("option"); option.value = d.serial; option.textContent = optionLabel(d); target.append(option);
+        }
+        target.disabled = online.length === 0;
+        if (online.some(d => d.serial === previous)) target.value = previous;
+        else if (online.length) target.value = online[0].serial;
+        const grid = el("phoneGrid"); grid.replaceChildren();
+        const devices = orderedDevices();
+        if (!devices.length) {
+          const empty = document.createElement("div"); empty.className = "screen-placeholder";
+          empty.textContent = "No Android phones detected. Attach phones to this computer, then refresh devices.";
+          grid.append(empty);
+        }
+        for (const d of devices) {
+          const card = document.createElement("article"); card.className = "phone-card";
+          card.dataset.serial = d.serial;
+          const head = document.createElement("div"); head.className = "phone-head";
+          const label = document.createElement("label"); label.className = "check";
+          const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = state.selected.has(d.serial); checkbox.disabled = d.state !== "device";
+          checkbox.addEventListener("change", () => { checkbox.checked ? state.selected.add(d.serial) : state.selected.delete(d.serial); updateCounts(); });
+          const name = document.createElement("span"); name.className = "phone-name"; name.textContent = d.label;
+          label.append(checkbox, name); head.append(label); card.append(head);
+          const serial = document.createElement("div"); serial.className = "phone-state"; serial.textContent = d.serial; card.append(serial);
+          const stateLabel = document.createElement("div"); stateLabel.className = "phone-state"; stateLabel.dataset.previewState = "true"; stateLabel.dataset.serial = d.serial;
+          stateLabel.textContent = state.previewStates[d.serial] || (d.state === "device" ? "Waiting for frame…" : d.state); card.append(stateLabel);
+          const frame = document.createElement("div"); frame.className = "phone-frame";
+          const img = document.createElement("img"); img.alt = `${d.label} screen`; img.dataset.serial = d.serial; img.hidden = true; img.tabIndex = 0;
+          img.addEventListener("pointerdown", pointerDown); img.addEventListener("pointerup", pointerUp); img.addEventListener("pointercancel", () => state.pointer = null);
+          const empty = document.createElement("div"); empty.className = "screen-placeholder";
+          empty.textContent = state.previewStates[d.serial] || (d.state === "device" ? "Waiting for screen…" : `ADB: ${d.state}`);
+          frame.append(img, empty); card.append(frame); grid.append(card);
+          if (state.frames[d.serial]) { img.src = `data:${state.frames[d.serial].mime};base64,${state.frames[d.serial].image}`; img.hidden = false; empty.hidden = true; }
+          const useTarget = document.createElement("button"); useTarget.type = "button"; useTarget.textContent = "Use as keyboard target";
+          useTarget.style.cssText = "width:100%; margin-top:8px; padding:6px 8px; font-size:12px";
+          useTarget.disabled = d.state !== "device";
+          useTarget.addEventListener("click", () => chooseTarget(d.serial)); card.append(useTarget);
+        }
+        updateTargetStyle();
+        updateCounts();
+      }
+
+      function onFrame(message) {
+        state.frames[message.serial] = { mime: message.mime, image: message.image };
+        const gridImg = [...el("phoneGrid").querySelectorAll("img")].find(img => img.dataset.serial === message.serial);
+        if (gridImg) { gridImg.src = `data:${message.mime};base64,${message.image}`; gridImg.hidden = false; const placeholder = gridImg.parentElement.querySelector(".screen-placeholder"); if (placeholder) placeholder.hidden = true; }
+      }
+      async function connect() {
+        state.token = el("token").value.trim();
+        if (!state.token) { setStatus("Paste the local bridge token first.", true); return; }
+        sessionStorage.setItem("pcc-token", state.token);
+        if (state.socket) state.socket.close();
+        setStatus("Connecting to this computer’s bridge…");
+        try {
+          const response = await fetch(`${API}/api/health`);
+          if (!response.ok) throw new Error("Local bridge returned an error.");
+          const health = await response.json();
+          state.host = health.host || "computer";
+          state.adb = Boolean(health.adb);
+          if (!health.adb) setStatus(`Bridge is running on ${state.host}, but ADB was not found.`, true);
+        } catch (error) {
+          setConnected(false);
+          setStatus("Could not reach this computer’s bridge. Allow local network access in the browser, and confirm bridge.py is running here.", true);
+          return;
+        }
+        const socket = new WebSocket(WS); state.socket = socket;
+        socket.onopen = () => socket.send(JSON.stringify({ type: "auth", token: state.token }));
+        socket.onmessage = event => {
+          let message; try { message = JSON.parse(event.data); } catch { return; }
+          if (message.type === "devices") {
+            const nextSignature = JSON.stringify(message.devices || []);
+            const changed = nextSignature !== state.deviceSignature;
+            if (changed) {
+              state.devices = message.devices || []; state.deviceSignature = nextSignature; state.host = message.host || state.host;
+              const valid = new Set(onlineAndroids().map(d => d.serial)); state.selected = new Set([...state.selected].filter(serial => valid.has(serial)));
+              buildDevices();
+            }
+            setConnected(true, message.host || state.host);
+            if (changed) {
+              const androidCount = onlineAndroids().length;
+              let note = message.ffmpeg ? "Live H.264 previews" : "ADB screenshot fallback (install FFmpeg for smoother previews)";
+              if (!message.adb) note = "ADB not found; install Android Platform-Tools on this computer";
+              else if (!androidCount) note = "No authorized Android phones detected";
+              setStatus(`Connected to ${hostLabel(state.host)} · ${note}`);
+            }
+          }
+          else if (message.type === "frame") onFrame(message);
+          else if (message.type === "preview_state") {
+            state.previewStates[message.serial] = message.state;
+            const stateLabel = [...el("phoneGrid").querySelectorAll('[data-preview-state="true"]')].find(item => item.dataset.serial === message.serial);
+            if (stateLabel) stateLabel.textContent = message.state;
+            const card = [...el("phoneGrid").children].find(item => item.dataset.serial === message.serial);
+            const placeholder = card?.querySelector(".screen-placeholder");
+            if (placeholder && !state.frames[message.serial]) placeholder.textContent = message.state;
+          }
+        };
+        socket.onerror = () => { setConnected(false); setStatus("Could not reach the local bridge. Confirm it is running on this computer and allow local network access in the browser.", true); };
+        socket.onclose = event => { setConnected(false); if (state.socket === socket) state.socket = null; if (event.code === 1008) setStatus("Bridge token or allowed Hostinger origin is incorrect.", true); else setStatus("Bridge disconnected. Start bridge.py on this computer, then connect again.", true); };
+      }
+      async function action(name, serials, payload = {}) {
+        if (!state.token) { setStatus("Connect to this computer’s bridge first.", true); return false; }
+        try {
+          const response = await fetch(`${API}/api/action`, { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: name, serials, payload }) });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.detail || "Action failed");
+          const results = result.results || [];
+          const actionLabel = name === "launch"
+            ? [...document.querySelectorAll(".app-launch")].find(button => button.dataset.package === payload.package)?.textContent.trim() || "App"
+            : name;
+          const failed = results.filter(r => !r.ok);
+          setStatus(failed.length ? `Some phones did not accept ${actionLabel}: ${failed.map(r => r.serial).join(", ")}` : `${actionLabel}${name === "launch" ? " launch" : ""} sent to ${results.length} phone(s).`);
+          return result;
+        } catch (error) { setStatus(error.message || "Could not contact the local bridge.", true); return false; }
+      }
+      function renderSession() {
+        const start = el("sessionStart"), next = el("sessionNext");
+        const pause = el("sessionPause"), stop = el("sessionStop");
+        const selectedOnline = onlineAndroids().filter(device => state.selected.has(device.serial)).length;
+        start.disabled = !state.connected || selectedOnline === 0 || session.active;
+        if (!session.active) {
+          el("sessionClock").textContent = "3:00 each";
+          next.disabled = true; next.textContent = "Next app";
+          pause.disabled = true; pause.textContent = "Pause";
+          stop.disabled = true;
+          return;
+        }
+        const minutes = Math.floor(session.remaining / 60);
+        const seconds = String(session.remaining % 60).padStart(2, "0");
+        el("sessionClock").textContent = `${minutes}:${seconds}`;
+        const nextApp = sessionApps[session.index + 1];
+        next.textContent = nextApp ? `Next: ${nextApp.name}` : "Finish";
+        next.disabled = session.launching || session.remaining > 0 || !state.connected;
+        pause.textContent = session.paused ? "Resume" : "Pause";
+        pause.disabled = session.launching || session.remaining <= 0 || !state.connected;
+        stop.disabled = false;
+      }
+      function startManualSession() {
+        const serials = onlineAndroids()
+          .filter(device => state.selected.has(device.serial))
+          .map(device => device.serial);
+        if (!state.connected) return setStatus("Connect to the local bridge first.", true);
+        if (!serials.length) return setStatus("Select one or more authorized Android phones first.", true);
+        session.serials = serials;
+        session.active = true;
+        session.paused = false;
+        session.index = -1;
+        beginSessionApp(0);
+      }
+      async function beginSessionApp(index) {
+        if (session.timer) clearInterval(session.timer);
+        session.timer = null;
+        if (index >= sessionApps.length) return finishManualSession(true);
+        session.index = index;
+        session.remaining = 180;
+        session.paused = false;
+        session.launching = true;
+        const app = sessionApps[index];
+        el("sessionLabel").textContent = `Opening ${app.name} on ${session.serials.length} selected phone(s)…`;
+        renderSession();
+        const result = await action("launch", session.serials, { package: app.package });
+        if (!session.active || session.index !== index) return;
+        session.launching = false;
+        const results = result?.results || [];
+        const successes = results.filter(item => item.ok).length;
+        if (!successes) {
+          session.active = false;
+          session.serials = [];
+          el("sessionLabel").textContent = `${app.name} did not open; session stopped.`;
+          renderSession();
+          return;
+        }
+        const failed = results.length - successes;
+        el("sessionLabel").textContent = `${app.name} · use manually; timer waits before the next app${failed ? ` · ${failed} phone(s) failed to launch` : ""}`;
+        renderSession();
+        startSessionTimer();
+      }
+      function startSessionTimer() {
+        if (session.timer) clearInterval(session.timer);
+        session.timer = setInterval(() => {
+          if (!session.active || session.paused || !state.connected) return;
+          if (session.remaining > 0) session.remaining -= 1;
+          renderSession();
+          if (session.remaining <= 0) {
+            clearInterval(session.timer);
+            session.timer = null;
+            const appName = sessionApps[session.index].name;
+            el("sessionLabel").textContent = `3 minutes complete for ${appName}. Press Next app when ready.`;
+            renderSession();
+          }
+        }, 1000);
+      }
+      function advanceManualSession() {
+        if (!session.active || session.launching || session.remaining > 0 || !state.connected) return;
+        if (session.index + 1 >= sessionApps.length) return finishManualSession(true);
+        beginSessionApp(session.index + 1);
+      }
+      function toggleManualSessionPause() {
+        if (!session.active || session.launching || session.remaining <= 0 || !state.connected) return;
+        session.paused = !session.paused;
+        const appName = sessionApps[session.index].name;
+        el("sessionLabel").textContent = session.paused
+          ? `Paused on ${appName}. Resume when ready.`
+          : `${appName} · use manually; timer waits before the next app`;
+        if (session.paused) {
+          if (session.timer) clearInterval(session.timer);
+          session.timer = null;
+        } else {
+          startSessionTimer();
+        }
+        renderSession();
+      }
+      function finishManualSession(completed = false) {
+        if (session.timer) clearInterval(session.timer);
+        session.timer = null;
+        session.active = false;
+        session.paused = false;
+        session.launching = false;
+        session.index = -1;
+        session.remaining = 180;
+        session.serials = [];
+        el("sessionLabel").textContent = completed
+          ? "Session complete · current app stays open"
+          : "Session stopped · current app stays open";
+        renderSession();
+      }
+      function activeTargets(source) { return selectedTargets(source).filter(serial => onlineAndroids().some(d => d.serial === serial)); }
+      function point(event, image) {
+        const rect = image.getBoundingClientRect();
+        if (!image.naturalWidth || !image.naturalHeight) return null;
+        const scale = Math.min(rect.width / image.naturalWidth, rect.height / image.naturalHeight);
+        const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
+        const left = rect.left + (rect.width - width) / 2, top = rect.top + (rect.height - height) / 2;
+        return { x: Math.max(0, Math.min(1, (event.clientX - left) / width)), y: Math.max(0, Math.min(1, (event.clientY - top) / height)) };
+      }
+      function pointerDown(event) {
+        const image = event.currentTarget, start = point(event, image); if (!start) return;
+        chooseTarget(image.dataset.serial);
+        state.pointer = { serial: image.dataset.serial, start, at: performance.now() };
+        image.setPointerCapture(event.pointerId); image.focus?.(); event.preventDefault();
+      }
+      function pointerUp(event) {
+        if (!state.pointer) return;
+        const active = state.pointer; state.pointer = null;
+        const end = point(event, event.currentTarget); if (!end) return;
+        const targets = activeTargets(active.serial); if (!targets.length) return;
+        if (Math.hypot(end.x - active.start.x, end.y - active.start.y) > 0.025) action("swipe", targets, { x1: active.start.x, y1: active.start.y, x2: end.x, y2: end.y, duration: Math.max(100, Math.min(900, performance.now() - active.at)) });
+        else action("tap", targets, { x1: end.x, y1: end.y });
+      }
+      const keys = { Enter: "66", Backspace: "67", Escape: "4", " ": "62", Home: "3", ArrowLeft: "21", ArrowUp: "19", ArrowRight: "22", ArrowDown: "20" };
+      document.addEventListener("keydown", event => {
+        if (!el("keyboardFocus").checked || !state.socket || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+        const serial = el("target").value, targets = activeTargets(serial); if (!targets.length) return;
+        if (keys[event.key]) { event.preventDefault(); action("key", targets, { code: keys[event.key] }); }
+        else if (event.key.length === 1 && /^[A-Za-z0-9._@+/:?=, -]$/.test(event.key)) { event.preventDefault(); action("text", targets, { text: event.key === " " ? "%s" : event.key }); }
+      });
+
+      el("connectButton").addEventListener("click", connect);
+      el("refreshButton").addEventListener("click", async () => {
+        try { const response = await fetch(`${API}/api/devices`, { headers: authHeaders() }); const data = await response.json(); if (!response.ok) throw new Error(data.detail); state.devices = data.devices || []; state.deviceSignature = JSON.stringify(state.devices); buildDevices(); setStatus("Device list refreshed."); }
+        catch (error) { setStatus(error.message || "Refresh failed.", true); }
+      });
+      el("target").addEventListener("change", updateTargetStyle);
+      el("selectAll").addEventListener("click", () => { state.selected = new Set(onlineAndroids().map(d => d.serial)); buildDevices(); });
+      el("selectNone").addEventListener("click", () => { state.selected.clear(); buildDevices(); });
+      el("wakeButton").addEventListener("click", () => action("wake", [...state.selected]));
+      document.querySelectorAll(".app-launch").forEach(button => button.addEventListener("click", () => {
+        const serials = [...state.selected];
+        if (!serials.length) return setStatus("Select one or more Android phones first.", true);
+        action("launch", serials, { package: button.dataset.package });
+      }));
+      el("sessionStart").addEventListener("click", startManualSession);
+      el("sessionNext").addEventListener("click", advanceManualSession);
+      el("sessionPause").addEventListener("click", toggleManualSessionPause);
+      el("sessionStop").addEventListener("click", () => finishManualSession(false));
+      renderSession();
+      if (state.token) setStatus("Bridge token restored for this browser session. Click Connect to this computer.");
+    })();
+  </script>
+</body>
+</html>

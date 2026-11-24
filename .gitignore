@@ -1,0 +1,9 @@
+# macOS and Python artifacts
+.DS_Store
+**/__pycache__/
+*.py[cod]
+
+# Private/local data and historical snapshots
+**/backups/
+webapp/device_bridge/.venv/
+webapp/device_bridge/bridge.json
